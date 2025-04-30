@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Atur cache PyTorch
-os.environ['TORCH_HOME'] = '/tmp/torch hub'
+os.environ['TORCH_HOME'] = '/tmp/torch_hub'
 
 # Zona waktu WIB (UTC+7)
 WIB = pytz.timezone('Asia/Jakarta')
@@ -399,7 +399,7 @@ def generate_telegram_narasi(sensor_data):
         f"🌡️ *Suhu*: **{statuses['temperature']}** (Nilai: {values.get('temperature', 'N/A')}°C)\n"
         f"Suhu {'normal dan nyaman' if 'normal' in statuses['temperature'].lower() else 'panas, perhatikan ventilasi'}.\n\n"
         f"💧 *Kelembapan*: **{statuses['humidity']}**\n"
-        f"Kelembapan {'normal' if values.get('humidity', 0) >= 30 and values.get('humidity', 0) <= 70 else 'tinggi, risiko jamur' if values.get('humidity', 0) > 70 else 'rendah, udara kering'}.\n\n"
+        f"Kelembapan {'tinggi, kemungkinan tidak ada asap rokok' if values.get('humidity', 0) > 70 else 'normal' if values.get('humidity', 0) >= 30 else 'rendah, kemungkinan ada asap rokok'}.\n\n"
         f"🎙️ *Amplitudo*: **{statuses['mic']}**\n"
         f"Suara {'sedang, mungkin ada orang' if values.get('mic', 0) >= 200 and values.get('mic', 0) < 600 else 'tinggi, aktivitas bising' if values.get('mic', 0) >= 600 else 'rendah, ruangan sepi'}."
     )
