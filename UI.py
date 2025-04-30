@@ -47,7 +47,7 @@ ALERT_COOLDOWN = 60  # 1 menit
 CAMERA_URL = "http://192.168.1.12:81/stream"
 BASE_URL = "http://192.168.1.11:8000"
 
-GEMINI_API_KEY = "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"
+GEMINI_API_KEY = "sk-or-v1-6c393dba96e553749e660827ede4aed8d1e508b76c94fa3cb4f517d4581affd4c"
 GEMINI_MODEL = "google/gemini-2.0-flash-001"
 
 # --- STYLE CSS ---
@@ -248,7 +248,7 @@ def fetch_latest_sensor_data():
     statuses["lux"] = evaluate_lux_condition(data_values.get("lux"), data_values.get("mq2"))
     statuses["temperature"] = evaluate_temperature_condition(data_values.get("temperature"))
     statuses["humidity"] = (
-        f"Kelembapan {data_values.get('humidity')}%: {'tinggi' if data_values.get('humidity') > 70 else 'normal' if data_values.get('humidity') >= 30 else 'rendah'}"
+        f"Kelembapan {data_values.get('humidity', 'N/A')}%: {'tinggi' if data_values.get('humidity') and data_values.get('humidity') > 70 else 'normal' if data_values.get('humidity') and data_values.get('humidity') >= 30 else 'rendah'}"
         if data_values.get("humidity") is not None else "Data kelembapan tidak tersedia"
     )
     statuses["mic"] = evaluate_mic_condition(data_values.get("mic"))
@@ -315,9 +315,9 @@ def evaluate_mic_condition(mic_value):
 def generate_narrative_report(mq2_status, mq2_value, lux_status, lux_value, temp_status, temp_value, humidity_status, humidity_value, mic_status, mic_value):
     return (
         f"📊 *Laporan Status Ruangan*\n"
-        f"- 🚨 Asap: {mq2_status} ({mq2_value})\n"
-        f"- 💡 Cahaya: {lux_status} ({lux_value} lux)\n"
-        f"- 🌡️ Suhu: {temp_status} ({temp_value}°C)\n"
+        f"- 🚨 Asap: {mq2_status} ({mq2_value if mq2_value is not None else 'N/A'})\n"
+        f"- 💡 Cahaya: {lux_status} ({lux_value if lux_value is not None else 'N/A'} lux)\n"
+        f"- 🌡️ Suhu: {temp_status} ({temp_value if temp_value is not None else 'N/A'}°C)\n"
         f"- 💧 Kelembapan: {humidity_status}\n"
         f"- 🎙️ Amplitudo: {mic_status}\n"
         f"🕒 Waktu (WIB): {datetime.datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')}"
@@ -360,8 +360,8 @@ def get_room_condition_summary(mq2_value, lux_value, temperature_value, humidity
     lux_status = evaluate_lux_condition(lux_value, mq2_value)
     temp_status = evaluate_temperature_condition(temperature_value)
     humidity_status = (
-        f"Kelembapan {humidity_value}%: {'tinggi' if humidity_value > 70 else 'normal' if humidity_value >= 30 else 'rendah'}"
-        if humidity_value else "Data tidak tersedia"
+        f"Kelembapan {humidity_value if humidity_value is not None else 'N/A'}%: {'tinggi' if humidity_value and humidity_value > 70 else 'normal' if humidity_value and humidity_value >= 30 else 'rendah'}"
+        if humidity_value is not None else "Data tidak tersedia"
     )
     mic_status = evaluate_mic_condition(mic_value)
 
@@ -401,11 +401,11 @@ def get_gemini_response(messages):
 def generate_chatbot_context(mq2_value, lux_value, temperature_value, humidity_value, mic_value):
     return (
         f"Data sensor:\n"
-        f"- Asap (MQ2): {mq2_value}\n"
-        f"- Cahaya: {lux_value} lux\n"
-        f"- Suhu: {temperature_value}°C\n"
-        f"- Kelembapan: {humidity_value}%\n"
-        f"- Amplitudo: {mic_value}\n"
+        f"- Asap (MQ2): {mq2_value if mq2_value is not None else 'N/A'}\n"
+        f"- Cahaya: {lux_value if lux_value is not None else 'N/A'} lux\n"
+        f"- Suhu: {temperature_value if temperature_value is not None else 'N/A'}°C\n"
+        f"- Kelembapan: {humidity_value if humidity_value is not None else 'N/A'}%\n"
+        f"- Amplitudo: {mic_value if mic_value is not None else 'N/A'}\n"
         f"Waktu (WIB): {datetime.datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')}\n"
         "Jawab sebagai asisten deteksi merokok."
     )
@@ -468,9 +468,9 @@ async def send_periodic_notification():
         statuses = sensor_data["statuses"]
         caption = (
             f"📊 *Laporan Ruangan* ({datetime.datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')})\n"
-            f"💨 Asap: {statuses['mq2']}\n"
-            f"💡 Cahaya: {statuses['lux']}\n"
-            f"🌡️ Suhu: {statuses['temperature']}\n"
+            f"💨 Asap: {statuses['mq2']} ({values.get('mq2', 'N/A')})\n"
+            f"💡 Cahaya: {statuses['lux']} ({values.get('lux', 'N/A')} lux)\n"
+            f"🌡️ Suhu: {statuses['temperature']} ({values.get('temperature', 'N/A')}°C)\n"
             f"💧 Kelembapan: {statuses['humidity']}\n"
             f"🎙️ Amplitudo: {statuses['mic']}"
         )
@@ -595,7 +595,7 @@ def main():
 
             current_time = time.time()
             if var_name == "mq2" and "Bahaya" in status and current_time - st.session_state.last_notification['mq2']['last_alert_sent'] > ALERT_COOLDOWN:
-                caption = f"🚨 *Peringatan Asap*: {status}\n📊 Nilai: {value}\n🕒 Waktu: {datetime.datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')}"
+                caption = f"🚨 *Peringatan Asap*: {status}\n📊 Nilai: {value if value is not None else 'N/A'}\n🕒 Waktu: {datetime.datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')}"
                 if st.session_state.latest_frame:
                     run_async(send_telegram_photo(st.session_state.latest_frame, caption))
                 else:
@@ -624,28 +624,27 @@ def main():
 
         # Chatbot
         st.subheader("💬 AI Chatbot")
-        with st.form("chat_form", clear_on_submit=True):
-            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-            for msg in st.session_state.chat_messages[1:]:
-                st.markdown(
-                    f'<div class="chat-message {msg["role"]}-message">{msg["content"]}</div>',
-                    unsafe_allow_html=True
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        for msg in st.session_state.chat_messages[1:]:
+            st.markdown(
+                f'<div class="chat-message {msg["role"]}-message">{msg["content"]}</div>',
+                unsafe_allow_html=True
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+        user_input = st.text_input("Tanya tentang kondisi ruangan...", key="chat_input")
+        if st.button("Kirim"):
+            st.session_state.chat_messages = [{
+                "role": "system",
+                "content": generate_chatbot_context(
+                    values.get('mq2'), values.get('lux'), values['temperature'],
+                    values.get('humidity'), values.get('mic')
                 )
-            st.markdown('</div>', unsafe_allow_html=True)
-            user_input = st.text_input("Tanya tentang kondisi ruangan...")
-            if st.form_submit_button("Kirim"):
-                st.session_state.chat_messages = [{
-                    "role": "system",
-                    "content": generate_chatbot_context(
-                        values.get('mq2'), values.get('lux'), values['temperature'],
-                        values.get('humidity'), values.get('mic')
-                    )
-                }]
-                st.session_state.chat_messages.append({"role": "user", "content": user_input})
-                with st.spinner("Menunggu AI..."):
-                    response = get_gemini_response(st.session_state.chat_messages)
-                    st.session_state.chat_messages.append({"role": "assistant", "content": response})
-                st.rerun()
+            }]
+            st.session_state.chat_messages.append({"role": "user", "content": user_input})
+            with st.spinner("Menunggu AI..."):
+                response = get_gemini_response(st.session_state.chat_messages)
+                st.session_state.chat_messages.append({"role": "assistant", "content": response})
+            st.rerun()
 
         # Prediksi Risiko
         st.subheader("🔍 Prediksi Risiko")
@@ -689,7 +688,7 @@ def main():
                 frame_placeholder.image(st.session_state.last_frame, channels="RGB")
                 status_placeholder.info("Kamera dimatikan")
 
-    st.markdown('<div class="footer">Dibuat dengan ❤️ oleh Tim IoT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="footer">Dibuat dengan ❤️ oleh Tim SIGMA BOYS</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
