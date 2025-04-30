@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Atur cache PyTorch
-os.environ['TORCH_HOME'] = '/tmp/torch_hub'
+os.environ['TORCH_HOME'] = '/tmp/torch hub'
 
 # Zona waktu WIB (UTC+7)
 WIB = pytz.timezone('Asia/Jakarta')
@@ -47,7 +47,7 @@ ALERT_COOLDOWN = 60  # 1 menit
 CAMERA_URL = "http://192.168.1.12:81/stream"
 BASE_URL = "http://192.168.1.11:8000"
 
-GEMINI_API_KEY = "sk-or-v1-6c393dba96e553749e660827ede4aed8d1e508b76c94fa3cb4f517d4581affd4c"
+GEMINI_API_KEY = "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"
 GEMINI_MODEL = "google/gemini-2.0-flash-001"
 
 # --- STYLE CSS ---
@@ -386,6 +386,25 @@ def generate_narasi_singkat(sensor_data):
     )
     return narasi
 
+# --- NARASI UNTUK TELEGRAM ---
+def generate_telegram_narasi(sensor_data):
+    values = sensor_data["values"]
+    statuses = sensor_data["statuses"]
+    narasi = (
+        f"📊 *Laporan Kondisi Ruangan* ({datetime.datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')})\n\n"
+        f"💨 *Asap (MQ2)*: **{statuses['mq2']}** (Nilai: {values.get('mq2', 'N/A')})\n"
+        f"Status asap menunjukkan {'bahaya' if 'Bahaya' in statuses['mq2'] else 'mencurigakan' if 'Mencurigakan' in statuses['mq2'] else 'aman'}.\n\n"
+        f"💡 *Cahaya*: **{statuses['lux']}** (Nilai: {values.get('lux', 'N/A')} lux)\n"
+        f"Ruangan {'gelap, kemungkinan lampu dimatikan' if 'gelap' in statuses['lux'].lower() else 'terang, pencahayaan cukup'}.\n\n"
+        f"🌡️ *Suhu*: **{statuses['temperature']}** (Nilai: {values.get('temperature', 'N/A')}°C)\n"
+        f"Suhu {'normal dan nyaman' if 'normal' in statuses['temperature'].lower() else 'panas, perhatikan ventilasi'}.\n\n"
+        f"💧 *Kelembapan*: **{statuses['humidity']}**\n"
+        f"Kelembapan {'normal' if values.get('humidity', 0) >= 30 and values.get('humidity', 0) <= 70 else 'tinggi, risiko jamur' if values.get('humidity', 0) > 70 else 'rendah, udara kering'}.\n\n"
+        f"🎙️ *Amplitudo*: **{statuses['mic']}**\n"
+        f"Suara {'sedang, mungkin ada orang' if values.get('mic', 0) >= 200 and values.get('mic', 0) < 600 else 'tinggi, aktivitas bising' if values.get('mic', 0) >= 600 else 'rendah, ruangan sepi'}."
+    )
+    return narasi
+
 # --- GEMINI AI CHATBOT ---
 def get_gemini_response(messages):
     headers = {"Authorization": f"Bearer {GEMINI_API_KEY}", "Content-Type": "application/json"}
@@ -464,16 +483,7 @@ async def send_periodic_notification():
     if 'last_notification_time' not in st.session_state or current_time - st.session_state.last_notification_time >= NOTIFICATION_INTERVAL:
         logger.info("Mengirim notifikasi periodik...")
         sensor_data = fetch_latest_sensor_data()
-        values = sensor_data["values"]
-        statuses = sensor_data["statuses"]
-        caption = (
-            f"📊 *Laporan Ruangan* ({datetime.datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')})\n"
-            f"💨 Asap: {statuses['mq2']} ({values.get('mq2', 'N/A')})\n"
-            f"💡 Cahaya: {statuses['lux']} ({values.get('lux', 'N/A')} lux)\n"
-            f"🌡️ Suhu: {statuses['temperature']} ({values.get('temperature', 'N/A')}°C)\n"
-            f"💧 Kelembapan: {statuses['humidity']}\n"
-            f"🎙️ Amplitudo: {statuses['mic']}"
-        )
+        caption = generate_telegram_narasi(sensor_data)
         if st.session_state.latest_frame:
             await send_telegram_photo(st.session_state.latest_frame, caption)
         else:
@@ -624,27 +634,28 @@ def main():
 
         # Chatbot
         st.subheader("💬 AI Chatbot")
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        for msg in st.session_state.chat_messages[1:]:
-            st.markdown(
-                f'<div class="chat-message {msg["role"]}-message">{msg["content"]}</div>',
-                unsafe_allow_html=True
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
-        user_input = st.text_input("Tanya tentang kondisi ruangan...", key="chat_input")
-        if st.button("Kirim"):
-            st.session_state.chat_messages = [{
-                "role": "system",
-                "content": generate_chatbot_context(
-                    values.get('mq2'), values.get('lux'), values['temperature'],
-                    values.get('humidity'), values.get('mic')
+        with st.form("chat_form", clear_on_submit=True):
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            for msg in st.session_state.chat_messages[1:]:
+                st.markdown(
+                    f'<div class="chat-message {msg["role"]}-message">{msg["content"]}</div>',
+                    unsafe_allow_html=True
                 )
-            }]
-            st.session_state.chat_messages.append({"role": "user", "content": user_input})
-            with st.spinner("Menunggu AI..."):
-                response = get_gemini_response(st.session_state.chat_messages)
-                st.session_state.chat_messages.append({"role": "assistant", "content": response})
-            st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+            user_input = st.text_input("Tanya tentang kondisi ruangan...")
+            if st.form_submit_button("Kirim"):
+                st.session_state.chat_messages = [{
+                    "role": "system",
+                    "content": generate_chatbot_context(
+                        values.get('mq2'), values.get('lux'), values['temperature'],
+                        values.get('humidity'), values.get('mic')
+                    )
+                }]
+                st.session_state.chat_messages.append({"role": "user", "content": user_input})
+                with st.spinner("Menunggu AI..."):
+                    response = get_gemini_response(st.session_state.chat_messages)
+                    st.session_state.chat_messages.append({"role": "assistant", "content": response})
+                st.rerun()
 
         # Prediksi Risiko
         st.subheader("🔍 Prediksi Risiko")
