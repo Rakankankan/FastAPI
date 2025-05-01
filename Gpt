@@ -1,0 +1,37 @@
+#include <WiFi.h>
+
+// Ganti dengan WiFi kamu
+const char* ssid = "NAMA_WIFI";
+const char* password = "PASSWORD_WIFI";
+
+// IP statis yang ingin kamu tetapkan
+IPAddress local_IP(192, 168, 1, 200);     // IP static ESP32-CAM
+IPAddress gateway(192, 168, 1, 1);        // IP router
+IPAddress subnet(255, 255, 255, 0);       // Subnet mask
+IPAddress primaryDNS(8, 8, 8, 8);         // DNS Google
+IPAddress secondaryDNS(8, 8, 4, 4);       // DNS cadangan
+
+void setup() {
+  Serial.begin(115200);
+
+  // Atur IP statis sebelum connect WiFi
+  if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
+    Serial.println("Gagal mengatur IP statis");
+  }
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi terkoneksi");
+  Serial.println("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void loop() {
+  // Program utama
+}
